@@ -35,9 +35,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import rs.ac.uns.ftn.informatika.jpa.service.UserService;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
 import org.springframework.transaction.annotation.Propagation;
 import java.util.*;
@@ -80,7 +78,7 @@ public class UserService implements UserDetailsService {
     private BloomFilter<String> usernameBloomFilter;
 
     private final Map<Integer, Deque<Instant>> followAttempts = new ConcurrentHashMap<>();
-    private static final int MAX_FOLLOWS_PER_MINUTE = 50;
+    private static final int MAX_FOLLOWS_PER_MINUTE = 1;    //50
 
     @Autowired
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, TokenUtils tokenUtils, AuthenticationManager authenticationManager, MeterRegistry meterRegistry) {
@@ -379,20 +377,22 @@ public ResponseEntity<UserTokenState> login(
     }
 
     private boolean canFollow(Integer followerId) {
-        Instant now = Instant.now();
+        Instant now = Instant.now();    //tacan trenutak kada je korisnik kliknuo follow
+        //followAttempts je mapa svih korisnika (kljuc) a vrednost joj je lista svih vremena kad su pokusali da zaprate
+        //timestamps je lista bas za tog jednog korisnika
         Deque<Instant> timestamps = followAttempts.computeIfAbsent(followerId, k -> new ConcurrentLinkedDeque<>());
 
         // Izbaci sve starije od 1 minuta
         while (!timestamps.isEmpty() &&
-                Duration.between(timestamps.peekFirst(), now).toMinutes() >= 1) {
-            timestamps.pollFirst();
+                Duration.between(timestamps.peekFirst(), now).toMinutes() >= 1) {   //peekFirst=najstariji
+            timestamps.pollFirst(); //brise se zapis stariji od 1min
         }
 
         if (timestamps.size() >= MAX_FOLLOWS_PER_MINUTE) {
             return false; // limit probijen
         }
 
-        timestamps.addLast(now);
+        timestamps.addLast(now);    //dodaje trenutni pokusaj na kraj liste
         return true;
     }
 
@@ -421,8 +421,9 @@ public ResponseEntity<UserTokenState> login(
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
 
+        //usporavanje izvrsenja
 //        try {
-//            Thread.sleep(2000);
+//            Thread.sleep(4000);
 //        } catch (InterruptedException e) {
 //            Thread.currentThread().interrupt();
 //            throw new RuntimeException("Thread interrupted during follow operation");
@@ -441,14 +442,9 @@ public ResponseEntity<UserTokenState> login(
 
     @Transactional
     public void simulateFollowWithDelay(Integer followerId, Integer followingId) {
-        try {
-            System.out.println("Simulacija počinje za korisnika: " + followerId);
-            Thread.sleep(2000); // Pauza da simulira sporo izvršenje
+            LOG.info("### START follow simulation for user {} at {}", followerId, LocalTime.now());
             followUser(followerId, followingId);
-            System.out.println("Simulacija završena za korisnika: " + followerId);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+            LOG.info("### END follow simulation for user {} at {}", followerId, LocalTime.now());
     }
 
 

@@ -54,7 +54,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.id = :id")
-    @QueryHints({@QueryHint(name = "javax.persistence.lock.timeout", value ="0")})
+    @QueryHints({@QueryHint(name = "javax.persistence.lock.timeout", value ="5000")})
     Optional<User> findByIdWithLock(@Param("id") Integer id);
 
     @Query("SELECT u FROM User u WHERE u.activated = false")
